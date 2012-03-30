@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>JavaScript-arkitektur med Backbone</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+    <script src="https://github.com/downloads/gnab/remark/remark-0.3.4.min.js" type="text/javascript"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"></script>
+    <script src="https://github.com/downloads/kjbekkelund/remark-bekk/bekk-0.0.3.js" type="text/javascript"></script>
+    <link href="https://github.com/downloads/kjbekkelund/remark-bekk/bekk-0.0.3.css" type="text/css" rel="stylesheet">
+    <style type="text/css" media="screen">
+      #slideshow .slide .content.front-page h1 { width: 100%; }
+      .slide p { padding: 0; margin: 1.1em 0; }
+      .slide ul { padding: 0; margin: 1.1em 0; }
+      .slide img { max-width: 100%; max-height: 600px; }
+      #slideshow .slide .content ul li { padding-left: 1.3em; }
+    </style>
+  </head>
+  <body>
+    <textarea id="source">
+
+.front-page
+
+# JavaScript-arkitektur
+
+## a.k.a. Backbone.js for fun and profit
+
+Slider tilpasset fra intern presentasjon i BEKK
+
+Kim Joar Bekkelund
+
+28/03/2012
+
+---
+
+.agenda
+
+# Agenda
+
+* Kort om Backbone
+* Oppsett av vår applikasjon
+* Backbone-abstraksjoner
+* Eksempel gjennom stacken
+* Erfaringer
+
+---
+
+# Hva er Backbone?
+
+Lite bibliotek (i overkant av 1k LOC)
+
+Har som mål å «gi struktur til JavaScript-applikasjoner»
+
+Høyere nivå abstraksjon, ikke ferdig rammeverk
+
+Økende popularitet
+
+Stabilt og nærmer seg 1.0
+
+Aktiv utvikling
+
+---
+
+# … meeeeeeen
+
+Designet for å være minimalistisk
+
+… og man må dermed ta mange valg selv
+
+Er hverken MVC, MVP eller MVVM ut av boksen
+
+Lett å sette det i båsen «vanskelig dritt som jeg ikke skjønner»
+
+Eller eventuelt «wtf, dette henger jo ikke sammen»
+
+---
+
+.middle.center
+
+![](img/hn-bb-large.png)
+
+---
+
+.middle.center
+
+# Våre valg
+
+---
+
+.middle.center
+
+![](img/app-setup.png)
+
+---
+
+.middle.center
+
+![](img/app-setup-init.png)
+
+---
+
+# App setup
+
+Init:
+
+    .javascript
+    jQuery(function() {
+      App.run(jQuery("body"));
+    });
+
+App:
+
+    .javascript
+    App.run = function(context) {
+      var appView = createAppView(context);
+
+      createRouter(appView);
+
+      // henter språk og metainformasjon …
+      bootstrap(function() {
+        // … og starter routing når den er ferdig
+        Backbone.history.start();
+      });
+    }
+
+---
+
+.middle.center
+
+![](img/app-setup-router.png)
+
+---
+
+# Router
+
+Mapper URL til funksjon.
+
+Hash-URL-er, for eksempel `#page`
+
+HTML5 History API, for eksempel `/page`
+
+    .javascript
+    // Bruker extend for å lage egen klasse basert på Backbone.Router
+    var Router = Backbone.Router.extend({
+
+      initialize: function(app) {
+        this.app = app;
+      }
+
+      // mapper fra url til funksjon
+      routes: {
+        "": "overview",
+        "users/:username": "user"
+      },
+
+      overview: function() {
+        // sett opp oversiktside
+      },
+
+      user: function(username) {
+        // sett opp brukerside
+      }
+
+    });
+
+---
+
+.middle.center
+
+![](img/app-setup-page.png)
+
+---
+
+# MV*
+
+Vi valgte å gå for MVP.
+
+![](img/mvp.png)
+
+Presenter: User-interface business logic for the view.
+
+View: Passive, for all intents and purposes "dumb".
+
+Les mer om MVC og MVP i [Essential JavaScript Design Patterns](http://addyosmani.com/resources/essentialjsdesignpatterns/book/)
+
+---
+
+# MV*
+
+MVP:
+
+![](img/mvp.png)
+
+Med våre komponenter:
+
+![](img/mvp-bb.png)
+
+---
+
+# Model
+
+Håndterer forretningslogikk.
+
+Nøkkel/verdi-par.
+
+    .javascript
+    // Bruker extend for å lage en egen User-klasse
+    var User = Backbone.Model.extend({
+      isAwesome: function() {
+        this.get("name") === "Kim Joar"
+      }
+    });
+
+    // initialiserer ved bruk av new
+    var user = new User();
+
+    // kan sette variabler med "set" og hente med "get"
+    user.set({"name": "Kim Joar"});
+    user.isAwesome(); // true
+
+---
+
+# Model
+
+Abstraherer bort AJAX:
+
+    .javascript
+    var User = Backbone.Model.extend({
+      url: "/user" // URL som skal brukes, kan også være en funksjon
+    });
+
+    var user = new User();
+
+    // for å hente data
+    user.fetch();
+
+    // for å lagre data
+    user.save();
+
+Istedenfor callbacks, brukes oftest eventer i Backbone.
+
+    .javascript
+    user.on("change:name", function() {
+      alert("name has changed");
+    });
+
+---
+
+# Collection
+
+Liste med modeller
+
+Abstraherer bort AJAX
+
+Fyrer eventer, blant annet `add`, `remove` og `reset`
+
+Mange herlige hjelpefunksjoner, som `filter`, `reduce`, `map` og `max`
+
+---
+
+.middle.center
+
+Det er *kun* models og collection som har lov til å kommunisere med serveren!
+
+---
+
+# Views
+
+Et view eier et DOM-element, `el`
+
+* Kan enten lage det selv
+* Eller få det som input
+
+
+    .javascript
+    // lage selv
+    var view = new Backbone.View();
+    console.log(view.el); // <div></div>
+
+    // som input
+    var view = new Backbone.View({ el: $('.app') });
+    console.log(view.el); // <div class="app"><h1>test</h1></div>
+
+---
+
+# Views
+
+Lytter på DOM-eventer
+
+    .javascript
+    Backbone.View.extend({
+      events: {
+        "submit .login": "login"
+      },
+
+      login: function() {}
+    });
+
+---
+
+# Views
+
+Lytter på model- og collection-eventer
+
+Kalle model- og collection-metoder
+
+    .javascript
+    Backbone.View.extend({
+      initialize: function() {
+        this.model.bind("change", this.render, this);
+      },
+
+      render: function() {
+        console.log(this.model.get("name"));
+      }
+    });
+
+---
+
+.middle.center
+
+Det er *kun* views som har lov til å røre DOM-en!
+
+---
+
+.middle.center
+
+![](img/flyt.png)
+
+---
+
+.middle.center
+
+![](img/deeper.jpg)
+
+---
+
+# Views -> DOM
+
+Hvordan view rendres er *helt* uspesifisert i Backbone, men det skal gjøres
+gjennom `render`-metoden til et view.
+
+    .javascript
+    var UserView = Backbone.View.extend({
+
+      // render er ansvarlig for å rendre viewet sin HTML til `el`
+      render: function() {
+
+        // Henter data, for eksempel alle model-attributter
+        var data = this.model.toJSON();
+
+        // Rendrer template med tilhørende data
+        // Kan bruke hvilken som helst template-motor
+        var template = Mustache.render(this.template, data);
+
+        // UserView eier DOM-elementet som ligger i `this.el`
+        // Vi rendrer template-HTML-en til dette DOM-elementet
+        $(this.el).html(template); // idiomatisk: this.$el.html(template);
+
+        // Konvensjon å returnere `this`
+        return this;
+
+      }
+
+    });
+
+---
+
+.middle.center
+
+La oss lage en side som skal vise konto-informasjon og en medlemsliste.
+
+---
+
+# Toppnivå views
+
+    .javascript
+    var Router = Backbone.Router.extend({
+
+      routes: { "": "overview" } // vi har kun én route: til oversiktssiden
+
+      // Vi har valgt å initialisere routeren med konteksten vi ønsker å rendre
+      // app-en vår i, her kalt `app`. Vårt eneste krav er at den har en
+      // `render`-metode som tar imot et view og rendrer det til DOM-en.
+      initialize: function(app) {
+        this.app = app;
+      }
+
+      overview: function() {
+        // PageView er vår navnekonvensjon for hoved-viewene
+        // Vi sender inn en tom User-collection og en tom Account-model
+        var view = new Overview.PageView({
+          users:   new Users(),
+          account: new Account()
+        });
+
+        // Rendrer viewet til DOM-en
+        // Ettersom users og account er tom, vil dette innebære at vi skriver
+        // inn overskrifter og diverse annen statisk info
+        this.app.render(view);
+
+        // Henter users og account. Grunnen til at vi rendret først er for å ha
+        // en plass å vise spinner når AJAX-requestene starter.
+        view.users.fetch();
+        view.account.fetch();
+      }
+
+    });
+
+---
+
+# Toppnivå views
+
+Eksempel på initialisering av Router med app-kontekst:
+
+    var AppView = Backbone.View.extend({
+      render: function(view) {
+        // Vi rendrer viewet og setter HTML-en til viewet i DOM-en. Her ser vi to
+        // sentrale elementer:
+        //
+        // 1. Verdien av konvensjonen at `render` returnerer `this`
+        // 2. Vi bruker `this.$(selector)` som i praksis er det samme som
+        //    `$(this.el).find(selector)`
+
+        this.$(".app").html(view.render().el);
+      }
+    });
+
+    // Dette er i praksis `createAppView` vi så i `App.run`
+    // Den får inn en `context`-variabel som er satt til $('body') når `App.run` kalles
+    var appView = new AppView({ el: $('body') });
+
+    // … og dette er i praksis `createRouter`
+    new Router(appView);
+
+Dermed har routeren en kontekst for å rendre toppnivå views. Positive aspekter:
+
+* Vi er kun avhengig av global jQuery på én plass, der `App.run` kalles. Alt
+  annen håndtering av DOM-en skjer i kontekst av denne inputen.
+* Dette er utrolig enkelt å teste siden vi ikke er avhengig av DOM-en, den sendes
+  alltid som input.
+
+---
+
+# Subviews
+
+La oss se nærmere på hvordan `PageView` fra forrige slide kan implementeres:
+
+    .javascript
+    Overview.PageView = Backbone.View.extend({
+      initialize: function(options) {
+        this.users    = options.users;
+        this.account  = options.account;
+        this.template = // hent fram en template
+      },
+
+      render: function() {
+        this.$el.html(Mustache.render(this.template));
+
+        // Slår opp i `el` ved bruk av this.$, som beskrevet på forrige slide
+        this.renderUsers(this.$(".users")); // toppnivå view består ofte av subviews
+        this.renderAccount(this.$(".account"));
+
+        return this;
+      },
+
+      // Husk at subviewene skal være fullt ansvarlig for sin `el` og dermed
+      // skal de være TOM når de blir satt opp. Jobben til hovedviewet er bare
+      // å sette opp det tomme elementet.
+      renderUsers: function(el) {
+        var view = new Overview.UsersView({ el: el, collection: this.users });
+        view.render();
+      },
+
+      renderAccount: function(el) {
+        var view = new Overview.AccountView({ el: el, model: this.account });
+        view.render();
+      }
+    });
+
+---
+
+# Subviews
+
+La oss så implementere subviewet `AccountView`:
+
+    .javascript
+    Overview.AccountView = Backbone.View.extend({
+
+      initialize: function() {
+        // `el`, `model`, `collection` og noen flere verdier, blir automatisk
+        // satt tilgjengelig på `this`, dermed trenger vi ikke skrive
+        // `this.model = options.model` her, slik vi gjorde i Overview.PageView
+
+        // Her kan vi observere modellen, og for eksempel lytte på `fetch:started`
+        // som fyres når AJAX-requester fyrer, og `fetch:finished` som fyrer når
+        // vi har mottatt respons. (Disse eventene har vi selv lagt til.)
+        // Andre paramter er funksjon som skal kalles, og tredje er kontekst
+        this.model.on("fetch:started",  this.addSpinner,    this);
+        this.model.on("fetch:finished", this.removeSpinner, this);
+        this.model.on("fetch:finished", this.render,        this);
+        this.template = // hent fram en template
+      },
+
+      render: function() {
+        this.$el.html(Mustache.render(this.template, this.model.toJSON()));
+        return this;
+      },
+
+      addSpinner: function() {
+        // do spinner stuff
+      },
+
+      remoteSpinner: function() {
+        // remove spinner stuff
+      }
+
+    });
+
+---
+
+.middle.center
+
+Totalt sett har vi da:
+
+![](img/flyt.png)
+
+---
+
+# Eventer
+
+Eventer er sentralt i en god JavaScript-arkitektur.
+
+Vi har vist bruken av det på models og collections, men det trengs ofte utenom
+disse abstraksjonene.
+
+Det er enkelt å lage en global eventaggregator i Backbone:
+
+    .javascript
+    // bruker Underscore.js til å legge event-funksjonalitet på et tomt objekt
+    var events = _.extend({}, Backbone.Events);
+
+    events.on("test", someMethod);
+    events.off("test", someMethod);
+    events.trigger("test");
+
+Bruk eventer for kontakt ut av en modul, for eksempel når et view skal gi
+beskjed om at noe har skjedd. Det gjør koden mye enklere å teste, og det blir
+mye mindre kobling mellom modulene.
+
+---
+
+# Lagarkitektur
+
+I koden vår har vi 2 lag for models, collections, og views:
+
+    .javascript
+    // Lager et Base.View fra Backbone.View …
+    Base.View = Backbone.View.extend({
+      renderTemplate: function(data) {
+        this.$el.html(Mustache.render(this.template, data));
+      }
+    });
+    
+    // … og lager alle våre view fra Base.View
+    // (Dermed har vi delte metoder på tvers av viewene våre)
+    var UserView = Base.View.extend({
+      render: function() {
+        this.renderTemplate(this.model.toJSON());
+      }
+    });
+
+Perfekt plassering for håndtering av templates, spinner, feil, og så videre.
+
+---
+
+# Det negative
+
+«Gjør som du vil» er vanskelig. I begynnelsen.
+
+Tar tid å finne flyten.
+
+`Backbone.sync` for kommunikasjon med serveren:
+
+* Vanskelig å utvide.
+* Den mest *komplekse* delen av kodebasen vår.
+
+Vi har nok funnet på hjulet ett par ganger.
+
+---
+
+# Erfaringer
+
+Bruk et rammeverk
+
+… men bruk et enkelt rammeverk
+
+Forstå rammeverket
+
+Simplify (se [Simple Made Easy](http://www.infoq.com/presentations/Simple-Made-Easy)!)
+
+Jobb med abstraksjoner
+
+Gjem kompleksiteten. Men ro ned på magien.
+
+Test. TEST. TEST!!
+
+Ha en diktator.
+
+Mange filer. Alltid funksjonsscopet.
+
+Bruk eventer. Seriøst, bare legg til ett par til.
+
+Backbone i seg selv er ikke nok.
+
+---
+
+.middle.center
+
+Takk for meg.
+
+    </textarea>
+    <div id="slideshow"></div>
+  </body>
+</html>
