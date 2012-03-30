@@ -100,17 +100,20 @@ Eller eventuelt «wtf, dette henger jo ikke sammen»
 
 # App setup
 
-Init:
+`init.js` er ansvarlig for å starte applikasjonen:
 
     .javascript
     jQuery(function() {
       App.run(jQuery("body"));
     });
 
-App:
+`app.js` inneholder basisoppsett for å kjøre opp applikasjonen, inklusive
+oppsett av router og henting av metainformasjon:
 
     .javascript
     App.run = function(context) {
+      // lager det vi har kalt et appview, og som rett og slett bare er
+      // konteksten vi ønsker å rendre resten av siden i, for eksempel $(".app")
       var appView = createAppView(context);
 
       createRouter(appView);
